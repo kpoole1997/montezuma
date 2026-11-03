@@ -88,8 +88,8 @@
         let score = 0;
         let gemsCollected = 0;
         let lives = 3;
-        let gameState = 'PLAYING'; // PLAYING, GAMEOVER, VICTORY
-        const worldWidth = 2400; // Wide sidescrolling level
+        let gameState = 'PLAYING';
+        const worldWidth = 2400;
 
         // Input Tracking
         const keys = { left: false, right: false, up: false, down: false };
@@ -123,7 +123,6 @@
 
         canvas.addEventListener('mousedown', () => {
             if (gameState === 'PLAYING') {
-                // Convert screen mouse to world coordinates
                 const worldMouseX = mouse.x + camera.x;
                 const worldMouseY = mouse.y + camera.y;
                 mouse.activeGrapple = { x: worldMouseX, y: worldMouseY };
@@ -133,8 +132,8 @@
 
         // Player Setup
         let player = {
-            x: 100,
-            y: 300,
+            x: 80,
+            y: 350,
             vx: 0,
             vy: 0,
             width: 28,
@@ -142,28 +141,20 @@
             speed: 4.5,
             jumpPower: -10.5,
             gravity: 0.45,
-            grounded: false,
-            facing: 'right'
+            grounded: false
         };
 
-        // Camera Tracking Object
         let camera = { x: 0, y: 0, width: canvas.width, height: canvas.height };
 
-        // Level Map Architecture (Platforms, Spikes, Gems, Exit)
         const platforms = [
-            // Start zone
             { x: 0, y: 410, w: 700, h: 40 },
             { x: 180, y: 310, w: 130, h: 20 },
             { x: 380, y: 240, w: 150, h: 20 },
             { x: 580, y: 170, w: 120, h: 20 },
-            
-            // Mid zone / Pit
             { x: 800, y: 410, w: 600, h: 40 },
             { x: 750, y: 280, w: 100, h: 20 },
             { x: 920, y: 210, w: 140, h: 20 },
             { x: 1150, y: 280, w: 120, h: 20 },
-
-            // Final Ascent Zone
             { x: 1500, y: 410, w: 900, h: 40 },
             { x: 1420, y: 310, w: 110, h: 20 },
             { x: 1600, y: 220, w: 130, h: 20 },
@@ -172,9 +163,9 @@
         ];
 
         const hazards = [
-            { x: 550, y: 395, w: 80, h: 15 }, // Spike pit 1
-            { x: 850, y: 395, w: 100, h: 15 }, // Spike pit 2
-            { x: 1650, y: 395, w: 120, h: 15 } // Spike pit 3
+            { x: 550, y: 395, w: 80, h: 15 },
+            { x: 850, y: 395, w: 100, h: 15 },
+            { x: 1650, y: 395, w: 120, h: 15 }
         ];
 
         let gems = [
@@ -211,7 +202,6 @@
             document.getElementById('livesVal').innerText = lives;
         }
 
-        // Web Audio Synthesizer for Immersive Audio
         let audioCtx = null;
         document.getElementById('audio-btn').addEventListener('click', () => {
             if (!audioCtx) {
@@ -238,8 +228,8 @@
                 gain.gain.linearRampToValueAtTime(0, now + 0.15);
             } else if (type === 'gem') {
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(659.25, now); // E5
-                osc.frequency.setValueAtTime(987.77, now + 0.1); // B5
+                osc.frequency.setValueAtTime(659.25, now);
+                osc.frequency.setValueAtTime(987.77, now + 0.1);
                 gain.gain.setValueAtTime(0.1, now);
                 gain.gain.linearRampToValueAtTime(0, now + 0.3);
             } else if (type === 'hurt') {
@@ -260,7 +250,7 @@
         }
 
         function startOrchestralScore() {
-            const notes = [110.00, 130.81, 164.81, 196.00, 220.00]; // Cinematic minor scale chords
+            const notes = [110.00, 130.81, 164.81, 196.00, 220.00];
             let step = 0;
             setInterval(() => {
                 if (!audioCtx || gameState !== 'PLAYING') return;
@@ -285,50 +275,36 @@
             }, 1400);
         }
 
-        // Engine Update Loop
         function update() {
             if (gameState !== 'PLAYING') return;
 
-            // Horizontal Movement & Friction
-            if (keys.left) {
-                player.vx = -player.speed;
-                player.facing = 'left';
-            } else if (keys.right) {
-                player.vx = player.speed;
-                player.facing = 'right';
-            } else {
-                player.vx *= 0.78;
-            }
+            if (keys.left) player.vx = -player.speed;
+            else if (keys.right) player.vx = player.speed;
+            else player.vx *= 0.78;
 
-            // Enhanced Jumping
             if (keys.up && player.grounded) {
                 player.vy = player.jumpPower;
                 player.grounded = false;
                 playSound('jump');
             }
 
-            // Realistic Grapple Swing Physics
             if (mouse.activeGrapple) {
                 let dx = mouse.activeGrapple.x - (player.x + player.width / 2);
                 let dy = mouse.activeGrapple.y - player.y;
                 let dist = Math.sqrt(dx * dx + dy * dy);
                 
-                // Reel in / out rope
                 if (keys.up && dist > 50) mouse.activeGrapple.y -= 3;
                 if (keys.down) mouse.activeGrapple.y += 3;
 
-                // Tension force pull calculation
                 let pullStrength = 0.18;
                 player.vx += dx * pullStrength * 0.04;
                 player.vy += dy * pullStrength * 0.04;
             }
 
-            // Apply Gravity & Velocity
             player.vy += player.gravity;
             player.x += player.vx;
             player.y += player.vy;
 
-            // Platform Collision Detection
             player.grounded = false;
             platforms.forEach(plat => {
                 if (player.x + player.width > plat.x && 
@@ -342,14 +318,10 @@
                 }
             });
 
-            // Level Borders & Pit Falls
             if (player.x < 0) player.x = 0;
             if (player.x + player.width > worldWidth) player.x = worldWidth - player.width;
-            if (player.y > canvas.height + 50) {
-                loseLife();
-            }
+            if (player.y > canvas.height + 50) loseLife();
 
-            // Hazard Spikes Collision
             hazards.forEach(h => {
                 if (player.x + player.width > h.x && player.x < h.x + h.w &&
                     player.y + player.height > h.y && player.y < h.y + h.h) {
@@ -357,7 +329,6 @@
                 }
             });
 
-            // Gem Pickups
             gems.forEach(gem => {
                 if (!gem.collected) {
                     let gx = gem.x + 12, gy = gem.y + 12;
@@ -372,13 +343,11 @@
                 }
             });
 
-            // Temple Exit Victory Check
             if (player.x + player.width > exitDoor.x && player.x < exitDoor.x + exitDoor.w &&
-                player.y + player.height > exitDoor.y && player.y < exitDoor.y + exitDoor.h) {
+                player.y + player.height > exitDoor.y && player.y + player.height < exitDoor.y + exitDoor.h) {
                 gameState = 'VICTORY';
             }
 
-            // Camera Smooth Follow
             camera.x = player.x - camera.width / 2 + player.width / 2;
             if (camera.x < 0) camera.x = 0;
             if (camera.x > worldWidth - camera.width) camera.x = worldWidth - camera.width;
@@ -388,5 +357,103 @@
             lives--;
             updateUI();
             playSound('hurt');
-            if (lives <= 0) {
-                gameState = 'GAMEOVER';
+            if (lives <= 0) gameState = 'GAMEOVER';
+            else respawnPlayer();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            ctx.fillStyle = '#26170e';
+            for (let i = 200; i < worldWidth; i += 450) {
+                ctx.fillRect(i, 0, 60, 410);
+                ctx.fillStyle = '#1c1009';
+                ctx.fillRect(i + 10, 20, 40, 370);
+                ctx.fillStyle = '#26170e';
+            }
+
+            platforms.forEach(plat => {
+                ctx.fillStyle = '#54361c';
+                ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                ctx.strokeStyle = '#d4af37';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+                
+                ctx.fillStyle = '#3e2713';
+                ctx.fillRect(plat.x + 10, plat.y + 4, 25, 4);
+                ctx.fillRect(plat.x + plat.w - 35, plat.y + 4, 25, 4);
+            });
+
+            hazards.forEach(h => {
+                ctx.fillStyle = '#b53737';
+                for (let i = 0; i < h.w; i += 12) {
+                    ctx.beginPath();
+                    ctx.moveTo(h.x + i, h.y + h.h);
+                    ctx.lineTo(h.x + i + 6, h.y);
+                    ctx.lineTo(h.x + i + 12, h.y + h.h);
+                    ctx.fill();
+                }
+            });
+
+            gems.forEach(gem => {
+                if (!gem.collected) {
+                    ctx.fillStyle = '#00ffcc';
+                    ctx.shadowColor = '#00ffcc';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    let gx = gem.x + 12, gy = gem.y + 12;
+                    ctx.moveTo(gx, gy - 10);
+                    ctx.lineTo(gx + 9, gy);
+                    ctx.lineTo(gx, gy + 10);
+                    ctx.lineTo(gx - 9, gy);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+            });
+
+            ctx.fillStyle = '#4a2e18';
+            ctx.fillRect(exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h);
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(exitDoor.x, exitDoor.y, exitDoor.w, exitDoor.h);
+            ctx.fillStyle = '#d4af37';
+            ctx.beginPath();
+            ctx.arc(exitDoor.x + exitDoor.w - 10, exitDoor.y + exitDoor.h / 2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (mouse.activeGrapple) {
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(player.x + player.width / 2, player.y + player.height / 2);
+                ctx.lineTo(mouse.activeGrapple.x, mouse.activeGrapple.y);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(mouse.activeGrapple.x, mouse.activeGrapple.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#d97736';
+            ctx.fillRect(player.x, player.y + 12, player.width, player.height - 12);
+            ctx.fillStyle = '#332211';
+            ctx.fillRect(player.x + 4, player.y + player.height - 10, player.width - 8, 10);
+            ctx.fillStyle = '#f5deb3';
+            ctx.fillRect(player.x + 5, player.y + 3, 18, 12);
+            ctx.fillStyle = '#422811';
+            ctx.fillRect(player.x + 2, player.y - 2, 24, 5);
+            ctx.fillRect(player.x + 6, player.y - 7, 16, 6);
+
+            ctx.restore();
+
+            if (gameState === 'GAMEOVER') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#ff4d4d';
+                ctx.font = 'bold 30px Courier New';
+                ctx.textAlign
