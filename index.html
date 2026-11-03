@@ -344,7 +344,7 @@
             });
 
             if (player.x + player.width > exitDoor.x && player.x < exitDoor.x + exitDoor.w &&
-                player.y + player.height > exitDoor.y && player.y + player.height < exitDoor.y + exitDoor.h) {
+                player.y + player.height > exitDoor.y && player.y < exitDoor.y + exitDoor.h) {
                 gameState = 'VICTORY';
             }
 
@@ -456,4 +456,34 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff4d4d';
                 ctx.font = 'bold 30px Courier New';
-                ctx.textAlign
+                ctx.textAlign = 'center';
+                ctx.fillText('TEMPLE TRAP - GAME OVER', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = '#e6d5bc';
+                ctx.font = '16px Courier New';
+                ctx.fillText('Press [ENTER] to Try Again', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            } else if (gameState === 'VICTORY') {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#d4af37';
+                ctx.font = 'bold 30px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('MONTEZUMA\'S TREASURE CONQUERED!', canvas.width / 2, canvas.height / 2 - 20);
+                ctx.fillStyle = '#e6d5bc';
+                ctx.font = '16px Courier New';
+                ctx.fillText(`Final Score: ${score} - Press [ENTER] to Play Again`, canvas.width / 2, canvas.height / 2 + 20);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        resetGame();
+        gameLoop();
+    </script>
+</body>
+</html>
