@@ -6,7 +6,7 @@
     <title>Temple of Montezuma</title>
     <style>
         body {
-            background-color: #1a120b;
+            background-color: #120a06;
             color: #e6d5bc;
             font-family: 'Courier New', Courier, monospace;
             display: flex;
@@ -18,8 +18,8 @@
             overflow: hidden;
         }
         h1 {
-            font-size: 1.8rem;
-            margin: 0 0 10px 0;
+            font-size: 1.6rem;
+            margin: 0 0 8px 0;
             letter-spacing: 2px;
             color: #d4af37;
             text-shadow: 2px 2px #000;
@@ -28,58 +28,81 @@
             position: relative;
             border: 4px solid #8c6239;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8);
-            background: #2c1d11;
+            background: #1c1109;
         }
         canvas {
             display: block;
-            background: #110b07;
+            background: linear-gradient(to bottom, #0f0805, #1f120a);
         }
         .ui-bar {
-            margin-top: 10px;
-            font-size: 1.1rem;
+            margin-top: 8px;
+            font-size: 1.05rem;
             font-weight: bold;
             letter-spacing: 1px;
         }
         .controls-hint {
-            margin-top: 6px;
-            font-size: 0.85rem;
+            margin-top: 5px;
+            font-size: 0.8rem;
             color: #a89378;
             text-align: center;
+        }
+        #audio-btn {
+            margin-top: 6px;
+            background: #8c6239;
+            color: #fff;
+            border: 2px solid #d4af37;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        #audio-btn:hover {
+            background: #a67c52;
         }
     </style>
 </head>
 <body>
 
-    <h1>TEMPLE OF MONTEZUMA</h1>
+    <h1>TEMPLE OF MONTEZUMA: EXPANDED EDITION</h1>
     
     <div id="game-container">
         <canvas id="gameCanvas" width="800" height="450"></canvas>
     </div>
 
     <div class="ui-bar">
-        Score: <span id="scoreVal">0</span> | Lives: <span id="livesVal">3</span>
+        Score: <span id="scoreVal">0</span> | Gems: <span id="gemsVal">0</span>/5 | Lives: <span id="livesVal">3</span>
     </div>
     
+    <button id="audio-btn">🎻 ENABLE ORCHESTRAL SCORE</button>
     <div class="controls-hint">
-        <strong>A / D</strong> to Run | <strong>W</strong> to Jump | <strong>Click</strong> to Grapple | <strong>Enter</strong> to Restart
+        <strong>A/D</strong> to Run | <strong>W / Space</strong> to Jump | <strong>Click</strong> to Grapple & Swing | <strong>S</strong> to Reel Down | <strong>Enter</strong> to Restart
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        // Game State & World Specs
         let score = 0;
+        let gemsCollected = 0;
         let lives = 3;
-        let gameState = 'PLAYING';
+        let gameState = 'PLAYING'; // PLAYING, GAMEOVER, VICTORY
+        const worldWidth = 2400; // Wide sidescrolling level
 
-        const keys = { left: false, right: false, up: false };
-        let activeGrapple = null;
+        // Input Tracking
+        const keys = { left: false, right: false, up: false, down: false };
+        let mouse = { x: 0, y: 0, activeGrapple: null };
 
         window.addEventListener('keydown', e => {
             if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.left = true;
             if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = true;
             if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Space') keys.up = true;
-            if (e.code === 'Enter' && gameState === 'GAMEOVER') resetGame();
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = true;
+            if (e.code === 'Enter' && (gameState === 'GAMEOVER' || gameState === 'VICTORY')) {
+                resetGame();
+            }
         });
 
         window.addEventListener('keyup', e => {
@@ -87,92 +110,231 @@
             if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.right = false;
             if (e.code === 'KeyW' || e.code === 'ArrowUp' || e.code === 'Space') {
                 keys.up = false;
-                activeGrapple = null; // Release grapple
+                if (e.code === 'Space') mouse.activeGrapple = null;
             }
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') keys.down = false;
         });
 
-        canvas.addEventListener('mousedown', e => {
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            mouse.x = e.clientX - rect.left;
+            mouse.y = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', () => {
             if (gameState === 'PLAYING') {
-                const rect = canvas.getBoundingClientRect();
-                activeGrapple = {
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                };
+                // Convert screen mouse to world coordinates
+                const worldMouseX = mouse.x + camera.x;
+                const worldMouseY = mouse.y + camera.y;
+                mouse.activeGrapple = { x: worldMouseX, y: worldMouseY };
+                playSound('grapple');
             }
         });
 
+        // Player Setup
         let player = {
             x: 100,
             y: 300,
             vx: 0,
             vy: 0,
-            width: 24,
-            height: 36,
-            speed: 4,
-            jumpPower: -8.5,
-            gravity: 0.4,
-            grounded: false
+            width: 28,
+            height: 40,
+            speed: 4.5,
+            jumpPower: -10.5,
+            gravity: 0.45,
+            grounded: false,
+            facing: 'right'
         };
 
+        // Camera Tracking Object
+        let camera = { x: 0, y: 0, width: canvas.width, height: canvas.height };
+
+        // Level Map Architecture (Platforms, Spikes, Gems, Exit)
         const platforms = [
-            { x: 0, y: 410, w: 800, h: 40 }, // Ground
-            { x: 150, y: 310, w: 120, h: 20 },
-            { x: 340, y: 230, w: 140, h: 20 },
-            { x: 560, y: 160, w: 150, h: 20 },
-            { x: 200, y: 130, w: 100, h: 20 }
+            // Start zone
+            { x: 0, y: 410, w: 700, h: 40 },
+            { x: 180, y: 310, w: 130, h: 20 },
+            { x: 380, y: 240, w: 150, h: 20 },
+            { x: 580, y: 170, w: 120, h: 20 },
+            
+            // Mid zone / Pit
+            { x: 800, y: 410, w: 600, h: 40 },
+            { x: 750, y: 280, w: 100, h: 20 },
+            { x: 920, y: 210, w: 140, h: 20 },
+            { x: 1150, y: 280, w: 120, h: 20 },
+
+            // Final Ascent Zone
+            { x: 1500, y: 410, w: 900, h: 40 },
+            { x: 1420, y: 310, w: 110, h: 20 },
+            { x: 1600, y: 220, w: 130, h: 20 },
+            { x: 1820, y: 160, w: 150, h: 20 },
+            { x: 2050, y: 240, w: 120, h: 20 }
         ];
+
+        const hazards = [
+            { x: 550, y: 395, w: 80, h: 15 }, // Spike pit 1
+            { x: 850, y: 395, w: 100, h: 15 }, // Spike pit 2
+            { x: 1650, y: 395, w: 120, h: 15 } // Spike pit 3
+        ];
+
+        let gems = [
+            { x: 220, y: 270, collected: false },
+            { x: 440, y: 200, collected: false },
+            { x: 980, y: 170, collected: false },
+            { x: 1650, y: 180, collected: false },
+            { x: 2100, y: 200, collected: false }
+        ];
+
+        const exitDoor = { x: 2250, y: 310, w: 50, h: 100 };
 
         function resetGame() {
             score = 0;
+            gemsCollected = 0;
             lives = 3;
             gameState = 'PLAYING';
-            player.x = 50;
+            respawnPlayer();
+            gems.forEach(g => g.collected = false);
+            updateUI();
+        }
+
+        function respawnPlayer() {
+            player.x = 80;
             player.y = 350;
             player.vx = 0;
             player.vy = 0;
-            activeGrapple = null;
-            updateUI();
+            mouse.activeGrapple = null;
         }
 
         function updateUI() {
             document.getElementById('scoreVal').innerText = score;
+            document.getElementById('gemsVal').innerText = gemsCollected;
             document.getElementById('livesVal').innerText = lives;
         }
 
+        // Web Audio Synthesizer for Immersive Audio
+        let audioCtx = null;
+        document.getElementById('audio-btn').addEventListener('click', () => {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                startOrchestralScore();
+                document.getElementById('audio-btn').innerText = '🎵 ORCHESTRAL SCORE ACTIVE';
+                document.getElementById('audio-btn').style.background = '#4a7c59';
+            }
+        });
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            let now = audioCtx.currentTime;
+
+            if (type === 'jump') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.15);
+            } else if (type === 'gem') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(659.25, now); // E5
+                osc.frequency.setValueAtTime(987.77, now + 0.1); // B5
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            } else if (type === 'hurt') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            } else if (type === 'grapple') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(350, now);
+                osc.frequency.exponentialRampToValueAtTime(700, now + 0.1);
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            }
+            osc.start(now);
+            osc.stop(now + 0.3);
+        }
+
+        function startOrchestralScore() {
+            const notes = [110.00, 130.81, 164.81, 196.00, 220.00]; // Cinematic minor scale chords
+            let step = 0;
+            setInterval(() => {
+                if (!audioCtx || gameState !== 'PLAYING') return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(notes[step % notes.length], audioCtx.currentTime);
+                
+                let filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(450, audioCtx.currentTime);
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                gain.gain.setValueAtTime(0.025, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.4);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 1.4);
+                step++;
+            }, 1400);
+        }
+
+        // Engine Update Loop
         function update() {
             if (gameState !== 'PLAYING') return;
 
-            // Horizontal Movement
-            if (keys.left) player.vx = -player.speed;
-            else if (keys.right) player.vx = player.speed;
-            else player.vx *= 0.8;
+            // Horizontal Movement & Friction
+            if (keys.left) {
+                player.vx = -player.speed;
+                player.facing = 'left';
+            } else if (keys.right) {
+                player.vx = player.speed;
+                player.facing = 'right';
+            } else {
+                player.vx *= 0.78;
+            }
 
-            // Jumping
+            // Enhanced Jumping
             if (keys.up && player.grounded) {
                 player.vy = player.jumpPower;
                 player.grounded = false;
+                playSound('jump');
             }
 
-            // Grappling Physics Pull
-            if (activeGrapple) {
-                let dx = activeGrapple.x - (player.x + player.width / 2);
-                let dy = activeGrapple.y - player.y;
-                player.vx += dx * 0.01;
-                player.vy += dy * 0.01;
+            // Realistic Grapple Swing Physics
+            if (mouse.activeGrapple) {
+                let dx = mouse.activeGrapple.x - (player.x + player.width / 2);
+                let dy = mouse.activeGrapple.y - player.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Reel in / out rope
+                if (keys.up && dist > 50) mouse.activeGrapple.y -= 3;
+                if (keys.down) mouse.activeGrapple.y += 3;
+
+                // Tension force pull calculation
+                let pullStrength = 0.18;
+                player.vx += dx * pullStrength * 0.04;
+                player.vy += dy * pullStrength * 0.04;
             }
 
-            // Gravity & Position Updates
+            // Apply Gravity & Velocity
             player.vy += player.gravity;
             player.x += player.vx;
             player.y += player.vy;
 
-            // Platform Collision
+            // Platform Collision Detection
             player.grounded = false;
             platforms.forEach(plat => {
                 if (player.x + player.width > plat.x && 
                     player.x < plat.x + plat.w &&
                     player.y + player.height >= plat.y && 
-                    player.y + player.height <= plat.y + 15 && 
+                    player.y + player.height <= plat.y + 16 && 
                     player.vy >= 0) {
                     player.y = plat.y - player.height;
                     player.vy = 0;
@@ -180,74 +342,51 @@
                 }
             });
 
-            // Boundaries & Pit Falls
+            // Level Borders & Pit Falls
             if (player.x < 0) player.x = 0;
-            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            if (player.x + player.width > worldWidth) player.x = worldWidth - player.width;
             if (player.y > canvas.height + 50) {
-                lives--;
-                updateUI();
-                if (lives <= 0) {
-                    gameState = 'GAMEOVER';
-                } else {
-                    player.x = 50;
-                    player.y = 200;
-                    player.vx = 0;
-                    player.vy = 0;
-                }
+                loseLife();
             }
-        }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Platforms
-            platforms.forEach(plat => {
-                ctx.fillStyle = '#614124';
-                ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
-                ctx.strokeStyle = '#d4af37';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+            // Hazard Spikes Collision
+            hazards.forEach(h => {
+                if (player.x + player.width > h.x && player.x < h.x + h.w &&
+                    player.y + player.height > h.y && player.y < h.y + h.h) {
+                    loseLife();
+                }
             });
 
-            // Draw Grapple Line
-            if (activeGrapple) {
-                ctx.strokeStyle = '#d4af37';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(player.x + player.width / 2, player.y + player.height / 2);
-                ctx.lineTo(activeGrapple.x, activeGrapple.y);
-                ctx.stroke();
+            // Gem Pickups
+            gems.forEach(gem => {
+                if (!gem.collected) {
+                    let gx = gem.x + 12, gy = gem.y + 12;
+                    let dist = Math.hypot((player.x + player.width/2) - gx, (player.y + player.height/2) - gy);
+                    if (dist < 22) {
+                        gem.collected = true;
+                        score += 200;
+                        gemsCollected++;
+                        updateUI();
+                        playSound('gem');
+                    }
+                }
+            });
+
+            // Temple Exit Victory Check
+            if (player.x + player.width > exitDoor.x && player.x < exitDoor.x + exitDoor.w &&
+                player.y + player.height > exitDoor.y && player.y < exitDoor.y + exitDoor.h) {
+                gameState = 'VICTORY';
             }
 
-            // Draw Player
-            ctx.fillStyle = '#d97736';
-            ctx.fillRect(player.x, player.y + 10, player.width, player.height - 10);
-            ctx.fillStyle = '#deb887';
-            ctx.fillRect(player.x + 4, player.y, 16, 12);
-
-            // Game Over Screen
-            if (gameState === 'GAMEOVER') {
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff4d4d';
-                ctx.font = 'bold 28px Courier New';
-                ctx.textAlign = 'center';
-                ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 15);
-                ctx.fillStyle = '#e6d5bc';
-                ctx.font = '16px Courier New';
-                ctx.fillText('Press [ENTER] to Restart', canvas.width / 2, canvas.height / 2 + 20);
-                ctx.textAlign = 'left';
-            }
+            // Camera Smooth Follow
+            camera.x = player.x - camera.width / 2 + player.width / 2;
+            if (camera.x < 0) camera.x = 0;
+            if (camera.x > worldWidth - camera.width) camera.x = worldWidth - camera.width;
         }
 
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
-
-        resetGame();
-        loop();
-    </script>
-</body>
-</html>
+        function loseLife() {
+            lives--;
+            updateUI();
+            playSound('hurt');
+            if (lives <= 0) {
+                gameState = 'GAMEOVER';
